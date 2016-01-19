@@ -16,59 +16,45 @@ The following CHR rule generates all fibonacci numbers upto a given index `Max` 
 
 The CHR rule can be used in JavaScript after declaring it via the `chr()` function, like in this example:
 
-
     var CHR = require('chr')             // load the module
-    var konsole = require('chr/console') // little tool for graphical
-                                         //   representations
-
-    var chr = CHR()                      // create new handler
-    
+    var chr = CHR()                      // create new solver
+        
     // add the rule
-    chr('upto(Max), fib(A,AV), fib(B,BV) ==> B === A+1, B < Max | fib(B+1,AV+BV)')
+    chr('upto(Max), fib(A,AV), fib(B,BV) ==> \
+           B === A+1, B < Max | fib(B+1,AV+BV)')
 
-    konsole.log(chr.Store)               // print the content of the
+    console.log(chr.Store.toString())    // print the content of the
                                          //   constraint store
     /* results in:
-        ┌────────────┐                         
-        │ Constraint │
-        ├────────────┤
-        │ (empty)    │
-        └────────────┘
-    */
-       
-    chr.fib(1,1)                         // the first fibonacci is 1
-    chr.fib(2,1)                         // the second is 1
-
-    konsole.log(chr.Store)               // both have been stored
-    /* results in:
-        ┌────────────┐
-        │ Constraint │
-        ├────────────┤
-        │ fib(1,1)   │
-        ├────────────┤
-        │ fib(2,1)   │
-        └────────────┘
+        (empty)
     */
 
-    // now generate the fibonaccis upto the 5th element
-    chr.upto(5)
-    konsole.log(chr.Store)
+    Promise.all([
+      chr.fib(1,1),                      // the first Fibonacci is 1
+      chr.fib(2,1)                       // the second is 1
+    ])
+
+    console.log(chr.Store.toString())    // both have been stored
     /* results in:
-        ┌────────────┐
-        │ Constraint │
-        ├────────────┤
-        │ fib(1,1)   │
-        ├────────────┤
-        │ fib(2,1)   │
-        ├────────────┤
-        │ upto(5)    │
-        ├────────────┤
-        │ fib(3,2)   │
-        ├────────────┤
-        │ fib(4,3)   │
-        ├────────────┤
-        │ fib(5,5)   │
-        └────────────┘
+        ID  Constraint
+        --  ----------
+        1   fib(1,1)  
+        2   fib(2,1)  
+    */
+
+    // now generate the Fibonaccis upto the 5th element
+    chr.upto(5).then(function () {
+      console.log(chr.Store.toString())
+    })
+    /* results in:
+        ID  Constraint
+        --  ----------
+        1   fib(1,1)  
+        2   fib(2,1)  
+        3   upto(5)   
+        4   fib(3,2)  
+        5   fib(4,3)  
+        6   fib(5,5)
     */
 
 More example CHR scripts are provided at [chrjs.net](http://chrjs.net/).
@@ -82,29 +68,25 @@ The easiest way to precompile your JavaScript source code with embedded Constrai
     npm install babel-plugin-chr
     babel --plugins chr script.js
 
-However, CHR.js itself provides a command line tool to compile scripts that are dominated by Constraint Handling Rules:
-
-    chrjs script.chr > script.js
-
-Please note, that the given `.chr` files must be of the following form, where CHR rules are the main elements and arbitrary JavaScript code must be placed in a preamble section:
-
-    {
-      // preamble
-      // code in this block can be used in the rules' guards and bodies
-
-      function print (v) {
-        console.log(v)
-      }
-
-      function pred (v) {
-        return v < 5
-      }
-    }
-
-    print_num     @ num(v) ==> ${ () => print(v) }
-    generate_nums @ num(v) ==> ${ () => pred(v) } | num(v+1)
-
 Functions ecapsulated in `${ ... }` are evaluated at rule application, as for JIT compilation too.
+
+## REPL
+
+CHR.js provides a REPL (Read-eval-print loop) to use it interactively with the command line. The `CHR >` REPL can be started by calling `node repl.js` from within the project's root directory. Then it is possible to directly define rules and call constraints:
+
+    CHR > dec(0) <=> true
+      [Rule] Added.
+    CHR > dec(N) ==> dec(N-1)
+      [Rule] Added.
+    CHR > dec(4)
+      ID  Constraint
+      --  ----------
+      1   dec(4)    
+      2   dec(3)    
+      3   dec(2)    
+      4   dec(1)
+
+The REPL can also be used programmatically by calling `var Repl = require('chr/repl')`.
 
 ## Background
 

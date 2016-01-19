@@ -115,6 +115,9 @@
           else if (c.hasOwnProperty('original')) {
             entry.original = c.original
           }
+          else if (c.hasOwnProperty('expr')) {
+            entry.expr = c.expr
+          }
 
           ruleDescriptor.replacements.push(entry)
         }
@@ -204,6 +207,10 @@ Start
 ProgramWithPreamble
   = __ preamble:Preamble? __ program:Program {
       program.preamble = preamble
+      program.replacements = []
+      program.body.forEach(function (rule) {
+        program.replacements = program.replacements.concat(rule.replacements)
+      })
       return program
     }
 
@@ -227,6 +234,7 @@ Rule
         rule.name = name;
       }
       rule.original = text()
+      rule.location = location()
       return rule;
     }
 
@@ -291,8 +299,41 @@ RuleName
     }
 
 RuleIdentifier
-  = chars:($(!"@" DoubleStringCharacter))+ {
+  = chars:($(!"@" [a-z0-9_] DoubleStringCharacter))+ {
       return chars.join('').trim();
+    }
+
+Query
+  = __ first:ConstraintCall rest:(__ ","? __ ConstraintCall)* __ ","? __ {
+      return buildList(first, rest, 3);
+    }
+
+ConstraintCall
+  = constraintName:ConstraintName
+    parameters:("(" __ CallParameters __ ")")? {
+      var desc = { 
+        type: 'Constraint',
+        name: constraintName,
+        parameters: extractOptional(parameters, 2, []),
+        original: text()
+      };
+      if (desc.parameters === null) {
+        desc.parameters = [];
+      }
+      desc.arity = desc.parameters.length
+      desc.functor = desc.name + '/' + desc.arity;
+      return desc;
+    }
+
+CallParameters
+  = first:CallParameter rest:(__ "," __ CallParameter)* {
+      return buildList(first, rest, 3);
+    }
+
+CallParameter
+  = expression:Expression {
+      expression.original = text();
+      return expression;
     }
 
 Constraints
@@ -307,12 +348,14 @@ Constraint
         type: 'Constraint',
         name: constraintName,
         parameters: extractOptional(parameters, 2, []),
-        original: text()
+        original: text(),
+        location: location()
       };
       if (desc.parameters === null) {
         desc.parameters = [];
       }
       desc.arity = desc.parameters.length
+      desc.functor = desc.name + '/' + desc.arity;
       return desc;
     }
 
@@ -329,6 +372,7 @@ BodyConstraint
         desc.parameters = [];
       }
       desc.arity = desc.parameters.length
+      desc.functor = desc.name + '/' + desc.arity
       return desc;
     }
 
@@ -357,22 +401,31 @@ Guard
     }
 
 Replacement
-  = ReplacementOpeningSymbol num:$(DecimalIntegerLiteral) ReplacementClosingSymbol {
+  = ReplacementOpeningSymbol __ num:$(DecimalIntegerLiteral) __ ReplacementClosingSymbol {
       return {
         type: 'Replacement',
         num: parseInt(num)
       };
     }
-  / ReplacementOpeningSymbol __ source:PreambleSource __ ReplacementClosingSymbol {
+  / ReplacementOpeningSymbol __ func:FunctionExpression __ ReplacementClosingSymbol {
       return {
         type: 'Replacement',
-        original: source
+        expr: func
       };
     }
-  / ReplacementOpeningSymbol __ source:ArrowFunction __ ReplacementClosingSymbol {
+  / ReplacementOpeningSymbol __ func:$(ArrowFunction) __ ReplacementClosingSymbol {
       return {
         type: 'Replacement',
-        original: source
+        func: func
+      };
+    }
+  / ReplacementOpeningSymbol __ expr:$(Expression) __ ReplacementClosingSymbol {
+      return {
+        type: 'Replacement',
+        expr: {
+          type: 'SourceCode',
+          original: expr
+        }
       };
     }
 
@@ -384,8 +437,17 @@ ReplacementClosingSymbol
   = "}"
 
 ArrowFunction
-  = "()" __ "=>" __ source:PreambleSource {
-      return source;
+  = "(" __ params:FormalParameterList? __ ")" __ "=>" __ body:PreambleSource {
+      var desc = {
+        type: 'ArrowFunction',
+        original: text(),
+        params: [],
+        body: body
+      }
+      if (params) {
+        desc.params = params
+      }
+      return desc;
     }
 
 BuiltIns
@@ -1755,7 +1817,8 @@ FunctionExpression
         type:   "FunctionExpression",
         id:     extractOptional(id, 0),
         params: optionalList(extractOptional(params, 0)),
-        body:   body
+        body:   body,
+        original: text()
       };
     }
 

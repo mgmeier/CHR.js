@@ -1,6 +1,7 @@
 var History = require('./src/history')
 var Store = require('./src/store')
 var Constraint = require('./src/constraint')
+var dynamicCaller = require('./src/dynamic-caller')
 
 module.exports = {
   History: History,
@@ -8,7 +9,8 @@ module.exports = {
   Constraint: Constraint,
   Helper: {
     allDifferent: allDifferent,
-    dynamicCaller: dynamicCaller
+    dynamicCaller: dynamicCaller,
+    forEach: forEach
   }
 }
 
@@ -20,23 +22,57 @@ function allDifferent (arr) {
   })
 }
 
-function dynamicCaller (name) {
-  return function () {
-    var self = this
+function forEach (arr, iterator, onEnd) {
+  var indexes = Array.apply(null, Array(arr.length)).map(Number.prototype.valueOf, 0)
+  forEachOnIndex(arr, indexes, iterator, onEnd)
+}
 
-    var args = Array.prototype.slice.call(arguments)
-    var arity = arguments.length
-    var functor = name + '/' + arity
+function forEachOnIndex (arr, indexes, iterator, onEnd) {
+  var iterablePosition = -1
+  var values = []
+  var value
+  var ix
 
-    if (!self.Constraints[functor]) {
-      throw new Error('Constraint ' + name + '/' + arity + ' not defined.')
+  var disjoint = true
+  for (var position = 0; position < indexes.length; position++) {
+    ix = indexes[position]
+
+    if (typeof arr[position][ix] === 'undefined') {
+      return onEnd()
+    }
+    value = arr[position][ix].toString()
+
+    if (ix < arr[position].length - 1) {
+      iterablePosition = position
     }
 
-    var constraint = new Constraint(name, arity, args)
-    self.Store.add(constraint)
+    if (values.indexOf(value) >= 0) {
+      disjoint = false
+      break
+    }
 
-    self.Constraints[functor].forEach(function (occurence) {
-      occurence.call(self, constraint)
-    })
+    values.push(value)
   }
+
+  function next () {
+    if (iterablePosition === -1) {
+      return onEnd()
+    }
+
+    // calculate next indexes
+    if (iterablePosition > -1) {
+      indexes[iterablePosition] += 1
+      for (var ix = iterablePosition + 1; ix < indexes.length; ix++) {
+        indexes[ix] = 0
+      }
+    }
+
+    forEachOnIndex(arr, indexes, iterator, onEnd)
+  }
+
+  if (!disjoint) {
+    return next()
+  }
+
+  iterator(values, next)
 }

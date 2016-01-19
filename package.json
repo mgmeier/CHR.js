@@ -1,19 +1,29 @@
 {
   "name": "chr",
-  "version": "1.0.0",
-  "description": "Compile and run Constraint Handling Rules (CHR) in JavaScript",
+  "version": "2.0.5",
+  "description": "Interpreter for Constraint Handling Rules (CHR) in JavaScript",
   "main": "src/index.js",
   "scripts": {
-    "peg": "pegjs --allowed-start-rules 'Program,ProgramWithPreamble' src/parser.pegjs",
-    "prepublish": "npm run peg",
-    "browserify": "browserify -s chrjs compiler/browserify.js | uglifyjs > dist/chr.js",
+    "peg": "npm run peg-parser && npm run peg-repl",
+    "peg-parser": "pegjs --allowed-start-rules 'Program,ProgramWithPreamble,Query' --optimize size src/parser.pegjs src/parser.peg.js",
+    "peg-repl": "pegjs --allowed-start-rules 'Program,Query' --optimize speed src/parser.pegjs src/repl.peg.js",
+    "prepublish": "npm run peg && npm run dist",
+    "browserify-parser": "browserify -t uglifyify -s chrparser src/parser.peg.js | uglifyjs > ./dist/chrparser.min.js",
+    "browserify-wo-parser": "NODE_ENV=browserWithoutParser browserify -t envify -t uglifyify -t browserify-versionify -s CHR src/index.js | uglifyjs > ./dist/chr-wop.min.js",
+    "browserify-full": "NODE_ENV=browser browserify -t envify -t uglifyify -t browserify-versionify -s CHR src/index.js | uglifyjs > ./dist/chr.min.js",
+    "browserify": "npm run browserify-parser && npm run browserify-wo-parser && npm run browserify-full",
+    "browserify-nonminified": "browserify -s chrparser src/parser.peg.js > ./dist/chrparser.js && NODE_ENV=browser browserify -t envify -t browserify-versionify -s CHR src/index.js > ./dist/chr.js",
+    "dist": "npm run browserify && npm run browserify-nonminified",
     "standard": "standard",
-    "tape": "babel-tape-runner test/*.js test/**/**.js",
-    "pretest": "npm run peg",
+    "tape": "tape 'test/**/*.js'",
+    "pretest": "npm run peg; npm run browserify",
     "test": "npm run standard && npm run tape"
   },
   "bin": {
     "chrjs": "./bin/chrjs"
+  },
+  "engines": {
+    "node": "^4.0.0"
   },
   "keywords": [
     "CHR",
@@ -29,21 +39,29 @@
     "url": "git://github.com/fnogatz/CHR.js"
   },
   "devDependencies": {
-    "babel-tape-runner": "^1.1.0",
+    "browserify": "^13.0.0",
+    "browserify-versionify": "^1.0.6",
     "colors": "^1.0.3",
-    "pegjs": "^0.8.0",
-    "standard": "^4.5.4",
-    "tape": "^4.0.1",
-    "tconsole": "^0.4.0"
+    "envify": "^3.4.0",
+    "pegjs": "^0.9.0",
+    "standard": "^5.2.2",
+    "tape": "^4.2.0",
+    "tconsole": "^1.0.0",
+    "uglify-js": "^2.4.24",
+    "uglifyify": "^3.0.1"
   },
   "dependencies": {
+    "char-spinner": "^1.0.1",
     "commander": "^2.8.0",
-    "concat-stream": "^1.4.8"
+    "concat-stream": "^1.4.8",
+    "easy-table": "^1.0.0",
+    "uuid": "^2.0.1"
   },
   "standard": {
     "ignore": [
       "src/parser.js",
-      "dist/chr.js"
+      "src/compile/fake-scope.js",
+      "dist/**.js"
     ]
   }
 }

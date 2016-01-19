@@ -3,6 +3,7 @@ module.exports = Constraint
 function Constraint (name, arity, args) {
   this.name = name
   this.arity = arity
+  this.functor = name + '/' + arity
   this.args = args
   this.id = null
   this.alive = true
@@ -22,9 +23,9 @@ Constraint.prototype.toString = function toString () {
 }
 
 function escape (val) {
-  if (typeof val === 'string') {
-    return '"' + val + '"'
+  var res = JSON.stringify(val)
+  if (typeof res !== 'string') {
+    res = '"' + val.toString() + '"'
   }
-
-  return val
+  return res
 }

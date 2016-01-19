@@ -3,8 +3,15 @@ module.exports = Store
 var util = require('util')
 var events = require('events')
 
+var Table = require('easy-table')
+
 function Store () {
-  this.reset()
+  this._lastId = 0
+  this._store = {}
+  this._index = {}
+  this.length = 0
+
+  this.invalid = false
 }
 
 util.inherits(Store, events.EventEmitter)
@@ -23,7 +30,7 @@ Store.prototype.reset = function reset () {
  * @param  {Constraint} constraint
  * @return {Id}         ID of the stored Constraint
  */
-Store.prototype.add = function add (constraint) {
+Store.prototype.store = Store.prototype.add = function add (constraint) {
   var id = this._getNewConstraintId()
   constraint.id = id
   this._store[id] = constraint
@@ -74,6 +81,10 @@ Store.prototype.alive = function alive (id) {
   return this._store[id].alive
 }
 
+Store.prototype.allAlive = function allAlive (arr) {
+  return arr.every(this.alive.bind(this))
+}
+
 Store.prototype.args = function args (id) {
   return this._store[id].args
 }
@@ -97,4 +108,28 @@ Store.prototype.forEach = function (cb) {
   for (var id in this._store) {
     cb(this._store[id], id)
   }
+}
+
+Store.prototype.map = function (callback, thisArg) {
+  var res = []
+  for (var id in this._store) {
+    res.push(callback.call(thisArg, this._store[id], id, this))
+  }
+  return res
+}
+
+Store.prototype.toString = function () {
+  if (this.length === 0) {
+    return '(empty)'
+  }
+
+  var t = new Table()
+
+  this.forEach(function (constraint) {
+    t.cell('ID', constraint.id)
+    t.cell('Constraint', constraint.toString())
+    t.newRow()
+  })
+
+  return t.toString()
 }

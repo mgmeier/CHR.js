@@ -4,117 +4,139 @@ var CHR = require('../../src/index')
 
 test('a ==> ${ () => 1 < 2 } | b', function (t) {
   var chr = new CHR()
-  chr`
-    a ==> ${ () => 1 < 2 } | b
-  `
+  chr('a ==>', function (cb) { cb(1 < 2) }, '| b')
 
-  chr.a()
-  t.equal(chr.Store.length, 2)
-
-  t.end()
+  chr.a().then(function () {
+    t.equal(chr.Store.length, 2)
+    t.end()
+  })
 })
 
 test('a ==> ${ 1 < 2 } | b', function (t) {
   var chr = new CHR()
-  chr`
-    a ==> ${ 1 < 2 } | b
-  `
+  chr('a ==>', function (cb) { cb(1 < 2) }, '| b')
 
-  chr.a()
-  t.equal(chr.Store.length, 2)
-
-  t.end()
+  chr.a().then(function () {
+    t.equal(chr.Store.length, 2)
+    t.end()
+  })
 })
 
 test('a ==> ${ () => false } | b', function (t) {
   var chr = new CHR()
-  chr`
-    a ==> ${ () => false } | b
-  `
+  chr('a ==>', function (cb) { cb(false) }, '| b')
 
-  chr.a()
-  t.equal(chr.Store.length, 1, 'Guard not satisfied')
-
-  t.end()
-})
-
-test('a ==> ${ false } | b', function (t) {
-  var chr = new CHR()
-  chr`
-    a ==> ${ false } | b
-  `
-
-  chr.a()
-  t.equal(chr.Store.length, 1, 'Guard not satisfied')
-
-  t.end()
+  chr.a().then(function () {
+    t.equal(chr.Store.length, 1, 'Guard not satisfied')
+    t.end()
+  })
 })
 
 test('a ==> ${ () => fire("Rule fired") }', function (t) {
-  function fire (string) {
-    t.equal(string, 'Rule fired')
+  var fired = false
 
-    t.end()
+  function fire (string) {
+    fired = true
+    t.equal(string, 'Rule fired')
   }
 
   var chr = new CHR()
-  chr`
-    a ==> ${ () => fire('Rule fired') }
-  `
+  chr('a ==>', function (cb) { fire('Rule fired'); cb() })
 
-  chr.a()
+  chr.a().then(function () {
+    t.ok(fired, 'fire() has been called')
+    t.end()
+  })
 })
 
 test('a ==> ${ fire }', function (t) {
-  function fire () {
-    t.end()
+  var fired = false
+  function fire (cb) {
+    fired = true
+    cb()
   }
 
   var chr = new CHR()
-  chr`
-    a ==> ${ fire }
-  `
+  chr('a ==>', fire)
 
-  chr.a()
+  chr.a().then(function () {
+    t.ok(fired, 'fire() has been called')
+    t.end()
+  })
 })
 
 test('Scope', function (t) {
-  var chr = new CHR()
-  chr`
-    a ==> ${ () => i !== 0 } | b
-  `
-
   var i = 0
-  chr.a()
 
-  t.equal(chr.Store.length, 1, 'b not propagated')
+  var chr = new CHR()
+  chr('a ==>', function (cb) { cb(i !== 0) }, '| b')
 
-  i = 1
-  chr.a()
-  t.equal(chr.Store.length, 3, 'b propagated')
+  chr.a().then(function () {
+    t.equal(chr.Store.length, 1, 'b not propagated')
 
-  t.end()
+    i = 1
+    chr.a().then(function () {
+      t.equal(chr.Store.length, 3, 'b propagated')
+      t.end()
+    })
+  })
 })
 
 test('Replacement in String', function (t) {
-  t.test('a ==> ${ () => true } | b', function (t) {
-    var chr = new CHR()
-    chr('a ==> ${ () => true } | b')
+  var chr = new CHR()
+  chr('a ==>', function (cb) { cb(true) }, '| b')
 
-    chr.a()
+  chr.a().then(function () {
     t.equal(chr.Store.length, 2)
-
     t.end()
   })
+})
 
-  t.test('a ==> ${ true } | b', function (t) {
+test('Replacement with variable', function (t) {
+  t.test('a(N) ==> ${ (N) => p(N) }', function (t) {
+    function p (N) {
+      // noop
+    }
+
     var chr = new CHR()
-    chr('a ==> ${ true } | b')
+    chr('a(N) ==>', function (N, cb) { p(N); cb() })
 
-    chr.a()
-    t.equal(chr.Store.length, 2)
+    chr.a(42).then(function () {
+      t.end()
+    })
+  })
 
-    t.end()
+  t.test('a(N) ==> ${ (N) => p(N) }', function (t) {
+    var n
+
+    function p (k) {
+      n = k
+    }
+
+    var chr = new CHR()
+    chr('a(N) ==>', function (N, cb) { p(N); cb() })
+
+    chr.a(42).then(function () {
+      t.equal(n, 42)
+      t.end()
+    })
+  })
+
+  t.test('a(N) ==> ${ p }', function (t) {
+    var m
+
+    function p (N, cb) {
+      m = N
+      cb()
+    }
+
+    var chr = new CHR()
+    chr('a(N) ==>', p)
+
+    chr.a(42).then(function () {
+      t.equal(m, 42)
+      t.end()
+    })
   })
 
   t.end()
